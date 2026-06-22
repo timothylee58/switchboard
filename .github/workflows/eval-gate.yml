@@ -1,0 +1,47 @@
+name: Eval Gate
+
+# Blocks merge if supervisor routing accuracy regresses below threshold
+# on the labeled case set in tests/eval/. Mirrors the RAGAS faithfulness
+# gate pattern from NakTahu AI, applied to agentic routing decisions
+# instead of RAG retrieval quality.
+#
+# This is intentionally a SEPARATE workflow from core-ci.yml: eval gates
+# are domain-specific (each vertical has its own labeled cases) and may
+# eventually run on a different cadence (e.g. nightly against a larger
+# case set) than the structural CI checks.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  eval-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run routing accuracy eval gate
+        run: python -m pytest tests/eval/ -v -s
+
+      - name: Comment accuracy on PR
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '⚠️ Routing accuracy eval gate failed — supervisor routing quality regressed below the configured threshold. See the eval-gate job log for which test cases failed and why.'
+            })

@@ -1,0 +1,38 @@
+name: Core CI
+
+# This workflow is the artifact that proves the orchestration/domain
+# separation is enforced, not just claimed in a README. It fails the
+# build if core/ or governance/ ever imports a domain package — see
+# tests/test_architecture_boundary.py for the actual check.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Architecture boundary test (REQUIRED — never skip)
+        run: python -m pytest tests/test_architecture_boundary.py -v
+
+      - name: Supervisor + HITL unit tests
+        run: |
+          python -m pytest tests/test_supervisor_routing.py -v
+          python -m pytest tests/test_hitl_interrupt_resume.py -v
+
+      - name: Full test suite
+        run: python -m pytest tests/ -v --ignore=tests/eval
