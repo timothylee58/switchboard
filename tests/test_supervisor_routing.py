@@ -95,6 +95,24 @@ def test_supervisor_node_records_routing_history():
     assert result["routing_history"][0]["confidence"] == 0.7
 
 
+def test_routing_history_records_both_ends_of_the_hop():
+    """Regression guard: RoutingDecision must DECLARE every field the supervisor
+    passes it. Pydantic defaults to extra="ignore", so an undeclared field is
+    dropped silently at construction — no error, no warning, just a hop in the
+    audit trail that records where it went and not where it came from."""
+    AgentRegistry.register(_FakeAgent("agent_a", 0.9))
+    AgentRegistry.register(_FakeAgent("agent_b", 0.1))
+
+    state = _base_state()
+    state["current_agent"] = "agent_a"
+    state = request_handoff(state, target_agent_name="agent_b")
+
+    entry = supervisor_node(state)["routing_history"][0]
+
+    assert entry["from_agent"] == "agent_a"
+    assert entry["to_agent"] == "agent_b"
+
+
 def test_supervisor_node_unhandled_when_no_agent_claims():
     AgentRegistry.register(_FakeAgent("worker", 0.0))
 
