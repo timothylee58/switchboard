@@ -51,8 +51,7 @@ switchboard/
 │   ├── audit.py              # @audited decorator — start/success/error events
 │   ├── guardrails.py         # @guarded decorator — input/output secret scanning
 │   ├── hitl.py               # LangGraph interrupt() gate node
-│   └── eval/
-│       └── harness.py        # run_routing_eval() — scores routing accuracy at 80% gate
+│   └── eval_harness.py       # run_routing_eval() — scores routing accuracy at 80% gate
 │
 ├── agents/
 │   ├── _template/            # Copy this to start a new vertical (step-by-step docstring)
@@ -281,11 +280,24 @@ Built to prove the zero-core-changes claim. Zero lines changed in `core/` or `go
 └─────────────────┴────────────────────────────────────┘
 ```
 
+### Recorded demo scripts
+
+Two scene-by-scene scripts for recording the console end to end — setup commands, exact
+messages to type, what each one is expected to route to and why, and the narration beats
+that make the architecture visible rather than asserted:
+
+| Script | Shows |
+|--------|-------|
+| [`docs/demo/console-demo-devtools.md`](docs/demo/console-demo-devtools.md) | Supervisor routing across `triage_agent` / `ci_agent`, a mid-turn `request_handoff()` delegation, the `deploy_agent` HITL gate (approve + reject takes), and the live audit log filling up |
+| [`docs/demo/console-demo-sme-ops.md`](docs/demo/console-demo-sme-ops.md) | The same console and the same supervisor after swapping one import — `support_agent` → `billing_agent` delegation and the `escalation_agent` gate, proving the orchestration layer is domain-blind |
+
+Record them back to back and the cut writes itself: vertical #1 → the one-line swap → vertical #2.
+
 ---
 
 ## Routing eval harness
 
-`governance/eval/harness.py` provides `run_routing_eval()` — a lightweight accuracy gate that runs in CI:
+`governance/eval_harness.py` provides `run_routing_eval()` — a lightweight accuracy gate that runs in CI:
 
 ```python
 cases = [
@@ -327,6 +339,27 @@ Then in `agents/{your_domain}/agent.py`:
 8. Add your domain name to the `suspicious_tokens` list in `tests/test_architecture_boundary.py`.
 
 That's it. `core/` and `governance/` stay untouched. The boundary test will tell you immediately if anything leaks.
+
+### What a vertical actually costs
+
+The claim above is cheap to make, so here is the receipt — every line that exists because
+`sme_ops` exists, measured against everything it did *not* have to touch:
+
+| | Files | Lines |
+|---|---|---|
+| `agents/sme_ops/` (4 agents, 5 tools, 1 context schema) | 4 | 308 |
+| `tests/eval/test_sme_ops_decisions.py` (routing accuracy set) | 1 | 101 |
+| `api/main.py` — the domain import | 1 | **2** |
+| `tests/test_architecture_boundary.py` — one token in `suspicious_tokens` | 1 | **1** |
+| **`core/` + `governance/` — orchestration, routing, audit, guardrails, HITL** | **0** | **0 of 855** |
+
+A whole working vertical is ~400 lines you write plus 3 lines you edit. The 855 lines of
+orchestration and governance underneath it are the part you inherit for free — and the part
+CI stops you from accidentally forking.
+
+For a worked example of the swap itself, [`docs/demo/console-demo-sme-ops.md`](docs/demo/console-demo-sme-ops.md)
+walks through pointing the running app at a different vertical, including which parts of the
+console are genuinely domain-agnostic and which are still hardcoded demo scaffolding.
 
 ---
 
