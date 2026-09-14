@@ -85,10 +85,17 @@ switchboard/
 │   ├── lib/api.ts            # streamChat(), resolveApproval(), fetchAuditLog()
 │   └── types/index.ts        # Shared TypeScript types
 │
+├── scripts/
+│   └── new_vertical.py       # Scaffolds a vertical from _template in one command
+│
+├── docs/
+│   └── demo/                 # Scene-by-scene scripts for recording the console
+│
 └── tests/
     ├── test_architecture_boundary.py   # THE boundary enforcement test — AST-based
     ├── test_supervisor_routing.py       # Supervisor unit tests (domain-agnostic)
     ├── test_hitl_interrupt_resume.py     # HITL pause/approve/reject tests
+    ├── test_new_vertical_scaffold.py     # Scaffolder output validity tests
     └── eval/
         ├── test_agent_decisions.py       # devtools routing accuracy (80% gate)
         └── test_sme_ops_decisions.py     # sme_ops routing accuracy (80% gate)
@@ -290,8 +297,12 @@ that make the architecture visible rather than asserted:
 |--------|-------|
 | [`docs/demo/console-demo-devtools.md`](docs/demo/console-demo-devtools.md) | Supervisor routing across `triage_agent` / `ci_agent`, a mid-turn `request_handoff()` delegation, the `deploy_agent` HITL gate (approve + reject takes), and the live audit log filling up |
 | [`docs/demo/console-demo-sme-ops.md`](docs/demo/console-demo-sme-ops.md) | The same console and the same supervisor after swapping one import — `support_agent` → `billing_agent` delegation and the `escalation_agent` gate, proving the orchestration layer is domain-blind |
+| [`docs/demo/cold-build-third-vertical.md`](docs/demo/cold-build-third-vertical.md) | Building a *third* vertical from scratch on camera, against a clock, ending on a diff that shows zero lines changed in `core/` and `governance/` |
 
-Record them back to back and the cut writes itself: vertical #1 → the one-line swap → vertical #2.
+Record the first two back to back and the cut writes itself: vertical #1 → the one-line swap →
+vertical #2. The third is a different kind of recording — the first two show a built thing
+working, which proves the pattern is *expressible*; the cold build proves it is *adoptable*,
+which is the claim a reader actually has to take on trust otherwise.
 
 ---
 
@@ -316,10 +327,12 @@ Each vertical ships its own eval set under `tests/eval/`. The 80% accuracy thres
 ## Adding a new vertical
 
 ```bash
-cp -r agents/_template agents/{your_domain}
+python -m scripts.new_vertical {your_domain}
 ```
 
-Then in `agents/{your_domain}/agent.py`:
+That copies `agents/_template/`, renames every identifier, writes a routing eval file that
+passes on arrival, and registers the domain with the boundary test. Add `--activate` to point
+`api/main.py` at it, or `--dry-run` to see what it would write. Then implement the agents:
 
 1. Implement `can_handle`, `execute`, `required_tools`, `risk_level` for each agent.
 2. Set `always_gate = True` on any agent whose actions require human approval.
@@ -330,13 +343,14 @@ Then in `agents/{your_domain}/agent.py`:
    ```
 4. Create matching tools in `tools.py`, registering each via `ToolRegistry.register()`.
 5. Create a domain context schema in `schemas.py` (optional but recommended).
-6. In `api/main.py`, swap the two domain import lines:
-   ```python
-   import agents.{your_domain}.agent   # noqa: F401
-   import agents.{your_domain}.tools   # noqa: F401
-   ```
-7. Add your eval cases to `tests/eval/test_{your_domain}_decisions.py`.
-8. Add your domain name to the `suspicious_tokens` list in `tests/test_architecture_boundary.py`.
+6. Replace the generated case in `tests/eval/test_{your_domain}_decisions.py` with real
+   routing cases as you implement `can_handle()`.
+
+Steps the scaffolder already handled for you — worth knowing it did them, because skipping
+either by hand fails *silently*: it swapped the domain import in `api/main.py` (with
+`--activate`), and it added your domain to `suspicious_tokens` in
+`tests/test_architecture_boundary.py`. Without that second one, your new domain's name is the
+one name the boundary test never checks for in `core/`.
 
 That's it. `core/` and `governance/` stay untouched. The boundary test will tell you immediately if anything leaks.
 
@@ -351,9 +365,9 @@ The claim above is cheap to make, so here is the receipt — every line that exi
 | `tests/eval/test_sme_ops_decisions.py` (routing accuracy set) | 1 | 101 |
 | `api/main.py` — the domain import | 1 | **2** |
 | `tests/test_architecture_boundary.py` — one token in `suspicious_tokens` | 1 | **1** |
-| **`core/` + `governance/` — orchestration, routing, audit, guardrails, HITL** | **0** | **0 of 855** |
+| **`core/` + `governance/` — orchestration, routing, audit, guardrails, HITL** | **0** | **0 of 856** |
 
-A whole working vertical is ~400 lines you write plus 3 lines you edit. The 855 lines of
+A whole working vertical is ~400 lines you write plus 3 lines you edit. The 856 lines of
 orchestration and governance underneath it are the part you inherit for free — and the part
 CI stops you from accidentally forking.
 
