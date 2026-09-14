@@ -41,6 +41,7 @@ class RoutingDecision(BaseModel):
     checkpointer never has to serialize a custom class."""
 
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    from_agent: str
     to_agent: str
     confidence: float
     reason: str
