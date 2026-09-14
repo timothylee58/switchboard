@@ -297,8 +297,12 @@ that make the architecture visible rather than asserted:
 |--------|-------|
 | [`docs/demo/console-demo-devtools.md`](docs/demo/console-demo-devtools.md) | Supervisor routing across `triage_agent` / `ci_agent`, a mid-turn `request_handoff()` delegation, the `deploy_agent` HITL gate (approve + reject takes), and the live audit log filling up |
 | [`docs/demo/console-demo-sme-ops.md`](docs/demo/console-demo-sme-ops.md) | The same console and the same supervisor after swapping one import — `support_agent` → `billing_agent` delegation and the `escalation_agent` gate, proving the orchestration layer is domain-blind |
+| [`docs/demo/cold-build-third-vertical.md`](docs/demo/cold-build-third-vertical.md) | Building a *third* vertical from scratch on camera, against a clock, ending on a diff that shows zero lines changed in `core/` and `governance/` |
 
-Record them back to back and the cut writes itself: vertical #1 → the one-line swap → vertical #2.
+Record the first two back to back and the cut writes itself: vertical #1 → the one-line swap →
+vertical #2. The third is a different kind of recording — the first two show a built thing
+working, which proves the pattern is *expressible*; the cold build proves it is *adoptable*,
+which is the claim a reader actually has to take on trust otherwise.
 
 ---
 
